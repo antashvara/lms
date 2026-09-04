@@ -1,20 +1,11 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export type UserRole =
-  | "admin"
-  | "guru"
-  | "siswa"
-  | "kurikulum"
-  | "kepala_sekolah";
-
-export type UserStatus = "active" | "inactive";
-
 export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  role: UserRole;
-  status: UserStatus;
+  role: "admin" | "guru" | "siswa" | "kurikulum" | "kepala_sekolah";
+  status: "aktif" | "nonaktif";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,8 +45,8 @@ const UserSchema = new Schema<IUser>(
 
     status: {
       type: String,
-      enum: ["active", "inactive"],
-      default: "active",
+      enum: ["aktif", "nonaktif"],
+      default: "aktif",
     },
   },
   {
