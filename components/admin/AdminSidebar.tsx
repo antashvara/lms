@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
@@ -11,7 +12,8 @@ import {
   FileCheck,
   BarChart3,
   FileText,
-  Settings,
+  GitBranch,
+  LogOut,
 } from "lucide-react";
 
 const menuGroups = [
@@ -52,6 +54,11 @@ const menuGroups = [
         label: "Mata Pelajaran",
         href: "/admin/mata-pelajaran",
         icon: BookOpen,
+      },
+      {
+        label: "Teaching Assignment",
+        href: "/admin/teaching-assignment",
+        icon: GitBranch,
       },
       {
         label: "Kurikulum",
@@ -145,6 +152,15 @@ export default function AdminSidebar() {
             </div>
           ))}
         </nav>
+
+          {/* Logout */}
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="mt-4 flex items-center gap-3 rounded-md px-2 py-2 text-xs text-[#A4A3A0] transition-colors hover:bg-[#161719] hover:text-[#F2F0EA]"
+        >
+          <LogOut size={14} strokeWidth={1.7} />
+          <span>Logout</span>
+        </button>
 
       </div>
     </aside>

@@ -24,6 +24,18 @@ export default function GuruPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [actionTeacher, setActionTeacher] = useState<string | null>(null);
+
+  const [editFormData, setEditFormData] = useState({
+  name: "",
+  email: "",
+  password: "",
+  nip: "",
+  status: "aktif",
+  });
+
   const [formData, setFormData] = useState({
   name: "",
   email: "",
@@ -69,7 +81,21 @@ export default function GuruPage() {
     }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleEditClick(teacher: Teacher) {
+  setEditingTeacher(teacher);
+
+  setEditFormData({
+    name: teacher.userId.name,
+    email: teacher.userId.email,
+    password: "",
+    nip: teacher.nip,
+    status: teacher.status,
+  });
+
+  setIsEditModalOpen(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) { 
   e.preventDefault();
 
   try {
@@ -111,6 +137,97 @@ export default function GuruPage() {
     );
   } finally {
     setSubmitting(false);
+  }
+}
+
+
+async function handleEditSubmit(e: React.FormEvent) {
+  e.preventDefault();
+
+  if (!editingTeacher) return;
+
+  try {
+    setSubmitting(true);
+    setError("");
+
+    const response = await fetch(
+      `/api/teachers/${editingTeacher._id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editFormData),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Gagal memperbarui data guru"
+      );
+    }
+
+    await fetchTeachers();
+
+    setIsEditModalOpen(false);
+    setEditingTeacher(null);
+
+    setEditFormData({
+      name: "",
+      email: "",
+      password: "",
+      nip: "",
+      status: "aktif",
+    });
+  } catch (error) {
+    console.error(error);
+
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Gagal memperbarui data guru"
+    );
+  } finally {
+    setSubmitting(false);
+  }
+}
+
+async function handleDelete(teacher: Teacher) {
+  const confirmed = window.confirm(
+    `Apakah kamu yakin ingin menghapus guru "${teacher.userId.name}"?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    setError("");
+
+    const response = await fetch(
+      `/api/teachers/${teacher._id}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Gagal menghapus guru"
+      );
+    }
+
+    await fetchTeachers();
+  } catch (error) {
+    console.error(error);
+
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Gagal menghapus guru"
+    );
   }
 }
 
@@ -191,7 +308,7 @@ export default function GuruPage() {
           <p className="text-[9px] tracking-[0.08em] text-[#6F7072]">
             EMAIL
           </p>
-
+        
           <p className="text-[9px] tracking-[0.08em] text-[#6F7072]">
             STATUS
           </p>
@@ -245,11 +362,56 @@ export default function GuruPage() {
                 </span>
               </div>
 
-              <button className="flex justify-center text-[#6F7072] transition hover:text-[#F2F0EA]">
+                {/* BUTTON EDIT */}
+              <div className="relative flex justify-center">
+              <button
+                type="button"
+                onClick={() =>
+                  setActionTeacher(
+                    actionTeacher === teacher._id ? null : teacher._id
+                  )
+                }
+                className="text-[#6F7072] transition hover:text-[#F2F0EA]"
+              >
                 <MoreHorizontal size={15} />
               </button>
 
-              {isModalOpen && (
+              {actionTeacher === teacher._id && (
+                <div className="absolute right-0 top-6 z-20 w-32 rounded-lg border border-[#292B30] bg-[#161719] py-1 shadow-xl">
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleEditClick(teacher);
+                      setActionTeacher(null);
+                    }}
+                    className="w-full px-3 py-2 text-left text-[10px] text-[#A4A3A0] transition hover:bg-[#1C1D20] hover:text-[#F2F0EA]"
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                  type="button"
+                  onClick={() => {
+                    setActionTeacher(null);
+                    handleDelete(teacher);
+                  }}
+                  className="w-full px-3 py-2 text-left text-[10px] text-red-400 transition hover:bg-[#1C1D20]"
+                >
+                  Hapus
+                </button>
+
+                </div>
+              )}
+            </div>
+
+              
+
+            </div>
+          ))}
+
+              {/* MODAL TAMBAH GURU */}
+          {isModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
                 <div className="w-full max-w-lg rounded-xl border border-[#292B30] bg-[#161719] shadow-2xl">
                 
@@ -384,8 +546,170 @@ export default function GuruPage() {
             </div>
             )}
 
+                {/* MODAL EDIT GURU */}
+      {isEditModalOpen && editingTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-[#292B30] bg-[#161719] shadow-2xl">
+
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#292B30] px-6 py-5">
+              <div>
+                <h2 className="text-lg font-semibold text-[#F2F0EA]">
+                  Edit Guru
+                </h2>
+
+                <p className="mt-1 text-sm text-[#6F7072]">
+                  Perbarui data guru.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingTeacher(null);
+                }}
+                className="text-[#6F7072] transition hover:text-[#F2F0EA]"
+              >
+                ✕
+              </button>
             </div>
-          ))}
+
+            {/* FORM */}
+            <form
+              onSubmit={handleEditSubmit}
+              className="space-y-5 px-6 py-6"
+            >
+
+              {/* Nama */}
+              <div>
+                <label className="mb-2 block text-sm text-[#A4A3A0]">
+                  Nama Guru
+                </label>
+
+                <input
+                  name="name"
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) =>
+                    setEditFormData((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-[#292B30] bg-[#111214] px-4 py-3 text-sm text-[#F2F0EA] outline-none placeholder:text-[#6F7072] focus:border-[#F59E0B]"
+                />
+              </div>
+
+              {/* NIP */}
+              <div>
+                <label className="mb-2 block text-sm text-[#A4A3A0]">
+                  NIP
+                </label>
+
+                <input
+                  name="nip"
+                  type="text"
+                  value={editFormData.nip}
+                  onChange={(e) =>
+                    setEditFormData((prev) => ({
+                      ...prev,
+                      nip: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-[#292B30] bg-[#111214] px-4 py-3 text-sm text-[#F2F0EA] outline-none placeholder:text-[#6F7072] focus:border-[#F59E0B]"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="mb-2 block text-sm text-[#A4A3A0]">
+                  Email
+                </label>
+
+                <input
+                  name="email"
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) =>
+                    setEditFormData((prev) => ({
+                      ...prev,
+                      email: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-[#292B30] bg-[#111214] px-4 py-3 text-sm text-[#F2F0EA] outline-none placeholder:text-[#6F7072] focus:border-[#F59E0B]"
+                />
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="mb-2 block text-sm text-[#A4A3A0]">
+                  Password Baru
+                </label>
+
+                <input
+                  name="password"
+                  type="password"
+                  value={editFormData.password}
+                  onChange={(e) =>
+                    setEditFormData((prev) => ({
+                      ...prev,
+                      password: e.target.value,
+                    }))
+                  }
+                  placeholder="Kosongkan jika tidak ingin mengubah"
+                  className="w-full rounded-lg border border-[#292B30] bg-[#111214] px-4 py-3 text-sm text-[#F2F0EA] outline-none placeholder:text-[#6F7072] focus:border-[#F59E0B]"
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="mb-2 block text-sm text-[#A4A3A0]">
+                  Status
+                </label>
+
+                <select
+                  name="status"
+                  value={editFormData.status}
+                  onChange={(e) =>
+                    setEditFormData((prev) => ({
+                      ...prev,
+                      status: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-[#292B30] bg-[#111214] px-4 py-3 text-sm text-[#F2F0EA] outline-none focus:border-[#F59E0B]"
+                >
+                  <option value="aktif">Aktif</option>
+                  <option value="nonaktif">Nonaktif</option>
+                </select>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 border-t border-[#292B30] px-0 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingTeacher(null);
+                  }}
+                  className="rounded-lg border border-[#292B30] px-4 py-2.5 text-sm font-medium text-[#A4A3A0] transition hover:bg-[#1C1D20] hover:text-[#F2F0EA]"
+                >
+                  Batal
+                </button>
+
+               <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-lg bg-[#F59E0B] px-4 py-2.5 text-sm font-medium text-black transition hover:bg-[#FFB11B] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submitting ? "Menyimpan..." : "Simpan Perubahan"}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
       </section>
 
