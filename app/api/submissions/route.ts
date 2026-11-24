@@ -5,8 +5,10 @@ import Submission from "@/models/Submission";
 import Assignment from "@/models/Assignment";
 import Student from "@/models/Student";
 import User from "@/models/User";
+import Subject from "@/models/Subject";
+import Teacher from "@/models/Teacher";
 
-export async function POST(req: Request) {
+export async function POST(req: Request) {  
   try {
     await connectDB();
 
@@ -147,6 +149,99 @@ export async function POST(req: Request) {
       {
         success: false,
         message: "Gagal mengumpulkan tugas",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(req: Request) {
+  try {
+    await connectDB();
+
+    // Memastikan model relasi sudah terdaftar
+    void Subject;
+    void Teacher;
+
+    // Mengambil parameter dari URL
+    const { searchParams } = new URL(req.url);
+
+    const assignmentId = searchParams.get("assignmentId");
+    const studentId = searchParams.get("studentId");
+
+    // Minimal salah satu filter wajib diisi
+    if (!assignmentId && !studentId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Assignment ID atau Student ID wajib diisi",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Membuat filter pencarian
+    const filter: {
+      assignmentId?: string;
+      studentId?: string;
+    } = {};
+
+    if (assignmentId) {
+      filter.assignmentId = assignmentId;
+    }
+
+    if (studentId) {
+      filter.studentId = studentId;
+    }
+
+    // Mengambil data submission
+    const submissions = await Submission.find(filter)
+      .sort({ submittedAt: -1 })
+      .populate({
+        path: "assignmentId",
+        model: Assignment,
+        populate: [
+          {
+            path: "subjectId",
+          },
+          {
+            path: "teacherId",
+            populate: {
+              path: "userId",
+              model: User,
+              select: "name email",
+            },
+          },
+        ],
+      })
+      .populate({
+        path: "studentId",
+        model: Student,
+        populate: {
+          path: "userId",
+          model: User,
+          select: "name email",
+        },
+      });
+
+    return NextResponse.json(
+      {
+        success: true,
+        total: submissions.length,
+        data: submissions,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error(
+      "GET /api/submissions error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Gagal mengambil data submission",
       },
       { status: 500 }
     );

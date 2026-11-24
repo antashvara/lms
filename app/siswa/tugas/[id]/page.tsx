@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -41,9 +42,21 @@ interface Assignment {
   }[];
 }
 
+interface Submission {
+  _id: string;
+  submissionUrl: string;
+  note: string;
+  submittedAt: string;
+  status: "submitted" | "late";
+}
+
+
 export default function TugasDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  
+    // ID sementara untuk pengujian
+  const studentId = "6ac30d392f62d90eb844ee0b";
 
   const [assignment, setAssignment] =
     useState<Assignment | null>(null);
@@ -51,11 +64,35 @@ export default function TugasDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Data pengumpulan tugas
+  const [submission, setSubmission] =
+    useState<Submission | null>(null);
+
+  const [submissionLoading, setSubmissionLoading] =
+    useState(true);
+
+  // Form pengumpulan
+  const [submissionUrl, setSubmissionUrl] =
+    useState("");
+
+  const [note, setNote] = useState("");
+
+  const [submitting, setSubmitting] =
+    useState(false);
+
+  const [submissionError, setSubmissionError] =
+    useState("");
+
+  const [submissionSuccess, setSubmissionSuccess] =
+    useState("");
+
+
   useEffect(() => {
-    if (id) {
-      fetchAssignment();
-    }
-  }, [id]);
+  if (id) {
+    fetchAssignment();
+    fetchSubmission();
+  }
+}, [id]);
 
   async function fetchAssignment() {
     try {
@@ -81,6 +118,115 @@ export default function TugasDetailPage() {
       setLoading(false);
     }
   }
+
+
+async function fetchSubmission() {
+  try {
+    setSubmissionLoading(true);
+    setSubmissionError("");
+
+    const response = await fetch(
+      `/api/submissions?assignmentId=${id}&studentId=${studentId}`
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Gagal memeriksa pengumpulan tugas"
+      );
+    }
+
+    const existingSubmission =
+      result.data.length > 0
+        ? result.data[0]
+        : null;
+
+    setSubmission(existingSubmission);
+
+    // Jika sudah pernah mengumpulkan,
+    // tampilkan kembali data sebelumnya
+    if (existingSubmission) {
+      setSubmissionUrl(
+        existingSubmission.submissionUrl || ""
+      );
+
+      setNote(existingSubmission.note || "");
+    }
+  } catch (error) {
+    console.error(error);
+
+    setSubmissionError(
+      "Gagal memeriksa status pengumpulan tugas."
+    );
+  } finally {
+    setSubmissionLoading(false);
+  }
+}
+
+
+async function handleSubmitAssignment(
+  event: FormEvent<HTMLFormElement>
+) {
+  event.preventDefault();
+
+  setSubmissionError("");
+  setSubmissionSuccess("");
+
+  if (!submissionUrl.trim()) {
+    setSubmissionError(
+      "Link hasil pengerjaan wajib diisi."
+    );
+    return;
+  }
+
+  try {
+    setSubmitting(true);
+
+    const response = await fetch(
+      "/api/submissions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          assignmentId: id,
+          studentId,
+          submissionUrl: submissionUrl.trim(),
+          note: note.trim(),
+        }),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Gagal mengumpulkan tugas."
+      );
+    }
+
+    // Simpan data submission yang baru dibuat
+    setSubmission(result.data);
+
+    setSubmissionSuccess(
+      "Tugas berhasil dikumpulkan!"
+    );
+  } catch (error) {
+    console.error(error);
+
+    setSubmissionError(
+      error instanceof Error
+        ? error.message
+        : "Terjadi kesalahan saat mengumpulkan tugas."
+    );
+  } finally {
+    setSubmitting(false);
+  }
+}
+
+
 
   function formatDeadline(deadline: string) {
     return new Date(deadline).toLocaleDateString(
@@ -323,28 +469,164 @@ export default function TugasDetailPage() {
           </section>
 
           {/* Submission placeholder */}
-          <section className="rounded-xl border border-[#202226] bg-[#111214] p-5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#6F7072]">
-              Pengumpulan
+
+      {/* Submission */}
+      <section className="rounded-xl border border-[#202226] bg-[#111214] p-5">
+        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#6F7072]">
+          Pengumpulan
+        </p>
+
+        {submissionLoading ? (
+          <p className="mt-4 text-xs text-[#6F7072]">
+            Memeriksa status pengumpulan...
+          </p>
+        ) : submission ? (
+          <>
+            <div className="mt-4 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+
+              <p className="text-sm font-medium text-[#F2F0EA]">
+                Sudah dikumpulkan
+              </p>
+            </div>
+
+            <p className="mt-2 text-xs text-[#6F7072]">
+              {submission.status === "late"
+                ? "Tugas dikumpulkan setelah deadline."
+                : "Tugas dikumpulkan tepat waktu."}
             </p>
 
+            <div className="mt-4 border-t border-[#202226] pt-4">
+              <p className="text-[10px] uppercase tracking-[0.08em] text-[#6F7072]">
+                Waktu pengumpulan
+              </p>
+
+              <p className="mt-1 text-xs text-[#A4A3A0]">
+                {new Date(
+                  submission.submittedAt
+                ).toLocaleString("id-ID", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-[10px] uppercase tracking-[0.08em] text-[#6F7072]">
+                Link hasil pengerjaan
+              </p>
+
+              <a
+                href={submission.submissionUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-[#202226] bg-[#161719] px-3 py-3 text-xs text-[#F2F0EA] transition hover:border-[#F59E0B]"
+              >
+                <span className="truncate">
+                  {submission.submissionUrl}
+                </span>
+
+                <ArrowUpRight
+                  size={14}
+                  className="shrink-0"
+                />
+              </a>
+            </div>
+
+            {submission.note && (
+              <div className="mt-4">
+                <p className="text-[10px] uppercase tracking-[0.08em] text-[#6F7072]">
+                  Catatan
+                </p>
+
+                <p className="mt-2 text-xs leading-5 text-[#A4A3A0]">
+                  {submission.note}
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
             <h2 className="mt-3 text-sm font-medium text-[#F2F0EA]">
               Belum dikumpulkan
             </h2>
 
             <p className="mt-2 text-xs leading-5 text-[#6F7072]">
-              Setelah siap, kamu bisa mengumpulkan
-              tugas dari halaman ini.
+              Masukkan link hasil pengerjaan untuk mengumpulkan tugas ini.
             </p>
 
-            <button
-              type="button"
-              disabled
-              className="mt-5 w-full rounded-lg bg-[#1C1D20] px-4 py-2.5 text-xs font-medium text-[#6F7072]"
+            <form
+              onSubmit={handleSubmitAssignment}
+              className="mt-5 space-y-4"
             >
-              Kumpulkan Tugas
-            </button>
-          </section>
+              <div>
+                <label className="mb-2 block text-[11px] font-medium text-[#A4A3A0]">
+                  Link hasil pengerjaan
+                </label>
+
+                <input
+                  type="url"
+                  value={submissionUrl}
+                  onChange={(event) =>
+                    setSubmissionUrl(event.target.value)
+                  }
+                  placeholder="https://github.com/username/project"
+                  required
+                  className="w-full rounded-lg border border-[#292B30] bg-[#161719] px-3 py-3 text-xs text-[#F2F0EA] outline-none transition placeholder:text-[#55565A] focus:border-[#F59E0B]"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[11px] font-medium text-[#A4A3A0]">
+                  Catatan (opsional)
+                </label>
+
+                <textarea
+                  value={note}
+                  onChange={(event) =>
+                    setNote(event.target.value)
+                  }
+                  placeholder="Tambahkan catatan untuk guru..."
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-[#292B30] bg-[#161719] px-3 py-3 text-xs text-[#F2F0EA] outline-none transition placeholder:text-[#55565A] focus:border-[#F59E0B]"
+                />
+              </div>
+
+              {submissionError && (
+                <p className="text-xs leading-5 text-red-400">
+                  {submissionError}
+                </p>
+              )}
+
+              {submissionSuccess && (
+                <p className="text-xs leading-5 text-emerald-400">
+                  {submissionSuccess}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-lg bg-[#F59E0B] px-4 py-3 text-xs font-semibold text-[#111214] transition hover:bg-[#FFB11B] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting
+                  ? "Mengirim tugas..."
+                  : "Kumpulkan Tugas"}
+              </button>
+            </form>
+          </>
+        )}
+
+        {submissionError && submission && (
+          <p className="mt-4 text-xs text-red-400">
+            {submissionError}
+          </p>
+        )}
+      </section>
+
         </aside>
       </div>
     </div>
