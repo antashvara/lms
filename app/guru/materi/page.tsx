@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { BookOpen, Plus, Search } from "lucide-react";
 
+import AddMaterialModal from "@/components/guru/materi/add-material-modal";
+
 interface Material {
   _id: string;
   title: string;
@@ -36,33 +38,34 @@ export default function GuruMateriPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+
+  // Mengambil materi milik guru yang sedang login
+  async function fetchMaterials() {
+    try {
+      const response = await fetch("/api/materials");
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error("Gagal mengambil data materi");
+      }
+
+      const userId = session?.user?.id;
+
+      const myMaterials = result.data.filter(
+        (material: Material) =>
+          material.teacherId?.userId?._id === userId
+      );
+
+      setMaterials(myMaterials);
+    } catch (error) {
+      console.error("Fetch Materials Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchMaterials() {
-      try {
-        const response = await fetch("/api/materials");
-        const result = await response.json();
-
-        if (!result.success) {
-          throw new Error("Gagal mengambil data materi");
-        }
-
-        const userId = session?.user?.id;
-
-        // Filter materi milik guru yang sedang login
-        const myMaterials = result.data.filter(
-          (material: Material) =>
-            material.teacherId?.userId?._id === userId
-        );
-
-        setMaterials(myMaterials);
-      } catch (error) {
-        console.error("Fetch Materials Error:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     if (session?.user?.id) {
       fetchMaterials();
     }
@@ -91,8 +94,10 @@ export default function GuruMateriPage() {
           </p>
         </div>
 
+        {/* Tombol Tambah Materi */}
         <button
           type="button"
+          onClick={() => setShowModal(true)}
           className="flex items-center justify-center gap-2 rounded-lg bg-[#F59E0B] px-4 py-2.5 text-sm font-medium text-black transition hover:bg-[#FFB11B]"
         >
           <Plus size={17} />
@@ -195,7 +200,7 @@ export default function GuruMateriPage() {
 
                 <p className="text-sm text-[#F2F0EA]">
                   {material.classId?.name || "-"}
-                </p>
+                </p>  
               </div>
 
               {/* Tanggal */}
@@ -214,6 +219,16 @@ export default function GuruMateriPage() {
           ))}
         </div>
       )}
+
+      {/* Modal Tambah Materi */}
+      {showModal && (
+        <AddMaterialModal
+          onClose={() => setShowModal(false)}
+          onSuccess={() => {
+            fetchMaterials();
+          }}
+        />
+      )}
     </div>
   );
-}
+} 
